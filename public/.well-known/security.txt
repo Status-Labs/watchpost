@@ -1,0 +1,5 @@
+Contact: https://github.com/Status-Labs/watchpost/security/advisories/new
+Policy: https://github.com/Status-Labs/watchpost/security/policy
+Preferred-Languages: en
+Canonical: https://watchpost.now/.well-known/security.txt
+Expires: 2027-10-23T00:00:00.000Z

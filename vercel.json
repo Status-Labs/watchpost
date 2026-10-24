@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/sync-osv",
+      "schedule": "2,17,32,47 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-kev",
+      "schedule": "7 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup",
+      "schedule": "10 4 * * *"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# Install scripts stay off unless a package truly needs one.
+allowBuilds:
+  cpu-features: false
+  esbuild: false
+  protobufjs: false
+  sharp: false
+  ssh2: false
+  unrs-resolver: false
+
+overrides:
+  # drizzle-kit's old loader pins esbuild 0.18 (GHSA-67mh-4wv8-2f99, dev server only).
+  "@esbuild-kit/core-utils>esbuild": "^0.25.0"
+  # @vercel/functions pulls in an old zod through its CLI config code (GHSA-mrhx-c7xc-m3w5).
+  "@vercel/cli-config>zod": "^4.6.7"
+
+# Don't install versions published less than 7 days ago (in minutes). Most
+# malicious releases are caught and pulled within that window.
+minimumReleaseAge: 10080
