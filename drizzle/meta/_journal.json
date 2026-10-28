@@ -29,6 +29,13 @@
       "when": 1792795725194,
       "tag": "0003_kev",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793206165310,
+      "tag": "0004_loose_name_index",
+      "breakpoints": true
     }
   ]
 }

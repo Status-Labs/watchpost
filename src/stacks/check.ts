@@ -5,6 +5,8 @@ import { oneLine, truncate } from "@/lib/sanitize";
 import { siteUrl, vulnPath } from "@/lib/site";
 import { toRows } from "@/osv/record";
 import { fetchRecord, mapUntil } from "@/osv/sync";
+import { isLocalMode } from "@/local/mode";
+import { matchLocally } from "@/match/local";
 import { queryOsv } from "./osv-query";
 import { SEVERITY_ORDER, dedupeAliases, fixedVersions } from "./results";
 import type { RejectedItem, StackItem } from "./validate";
@@ -46,8 +48,11 @@ type Advisory = {
 };
 
 export async function checkPackages(db: Db, items: StackItem[], fetchFn: Fetch = fetch): Promise<CheckResult[]> {
-  const found = await queryOsv(fetchFn, items);
-  const advisories = await loadAdvisories(db, fetchFn, found);
+  // Local mode matches against its own full copy of OSV, and never asks OSV
+  // anything that would reveal the package list or which advisories matched.
+  const local = isLocalMode();
+  const found = local ? (await matchLocally(db, items)).found : await queryOsv(fetchFn, items);
+  const advisories = await loadAdvisories(db, local ? null : fetchFn, found);
 
   const rows = found.flatMap(({ item, vulnId }) => {
     const advisory = advisories.get(vulnId);
@@ -107,7 +112,8 @@ async function exploitedCves(db: Db, ids: string[]): Promise<Set<string>> {
 
 async function loadAdvisories(
   db: Db,
-  fetchFn: Fetch,
+  // Null: use only what's stored.
+  fetchFn: Fetch | null,
   found: { item: StackItem; vulnId: string; modified: string }[],
 ): Promise<Map<string, Advisory>> {
   const ids = [...new Set(found.map((f) => f.vulnId))];
@@ -122,6 +128,7 @@ async function loadAdvisories(
 
   // Older advisories aren't in our copy; fetch them, but don't store them, so
   // the database never reflects what anyone checked.
+  if (!fetchFn) return advisories;
   const missing = new Map<string, { ecosystem: string; id: string; modified: string }>();
   for (const f of found) {
     if (!advisories.has(f.vulnId) && !missing.has(f.vulnId)) {

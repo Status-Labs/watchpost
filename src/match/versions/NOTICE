@@ -1,0 +1,12 @@
+The version parsers and comparators in this directory are ported from the
+semantic package of osv-scalibr (https://github.com/google/osv-scalibr) at
+commit 733765fd5ec0934bd9d2b14d6ff103eca06613d7.
+
+Copyright Google LLC
+
+Licensed under the Apache License, Version 2.0. A copy is in LICENSE-APACHE-2.0
+in this directory, and at https://www.apache.org/licenses/LICENSE-2.0.
+
+The files were translated from Go to TypeScript and adapted to this codebase;
+each says which osv-scalibr file it comes from. The rest of this repository is
+under its own license (see LICENSE at the root).

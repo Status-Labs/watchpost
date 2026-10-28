@@ -6,13 +6,13 @@ const alias = { "@": fileURLToPath(new URL("./src", import.meta.url)) };
 export default defineConfig({
   resolve: { alias },
   test: {
-    exclude: ["**/node_modules/**", "logo/**", ".claude/**"],
+    exclude: ["**/node_modules/**", "logo/**", ".claude/**", "cli/app/**"],
     projects: [
       {
         resolve: { alias },
         test: {
           name: "unit",
-          include: ["src/**/*.test.ts"],
+          include: ["src/**/*.test.ts", "cli/lib/**/*.test.mjs"],
           exclude: ["src/**/*.int.test.ts"],
           setupFiles: ["test/setup.ts"],
         },

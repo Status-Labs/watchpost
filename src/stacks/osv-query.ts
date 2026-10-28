@@ -70,6 +70,6 @@ async function postBatch(fetchFn: Fetch, queries: { item: StackItem; pageToken?:
 }
 
 // OSV's Go versions have no "v" prefix; go.mod has one.
-function osvVersion(item: StackItem): string {
+export function osvVersion(item: StackItem): string {
   return item.ecosystem === "Go" ? item.version.replace(/^v(?=\d)/, "") : item.version;
 }

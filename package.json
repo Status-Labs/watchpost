@@ -14,6 +14,7 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.11",
     "@modelcontextprotocol/server": "2.3.1",
     "@vercel/functions": "^3.10.1",
     "drizzle-orm": "^0.45.4",

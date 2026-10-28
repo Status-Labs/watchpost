@@ -1,0 +1,9 @@
+The version comparison fixtures in this directory are copied from the
+semantic/testdata directory of osv-scalibr (https://github.com/google/osv-scalibr)
+at commit 733765fd5ec0934bd9d2b14d6ff103eca06613d7.
+
+Copyright Google LLC
+
+Licensed under the Apache License, Version 2.0. A copy is in
+src/match/versions/LICENSE-APACHE-2.0, and at
+https://www.apache.org/licenses/LICENSE-2.0.

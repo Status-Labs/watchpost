@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, gte, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
-import { getDb } from "@/db";
+import { getDb, queryRows } from "@/db";
 import { kev, vulnPackages, vulns, type Severity } from "@/db/schema";
 import { categoryEcosystems, categoryPattern, type CategoryId } from "./categories";
 
@@ -58,8 +58,24 @@ const packagesOf = sql<{ ecosystem: string; name: string }[]>`coalesce((
 
 // The KEV entry for an advisory, through its CVE alias (or its own ID for CVE records).
 const exploitOf = sql`left join lateral (
-  select ek.ransomware from ${kev} ek where ek.cve_id = any(${vulns.aliases} || ${vulns.id}) limit 1
+  select ek.ransomware from ${kev} ek where ek.cve_id = any(${vulns.aliases} || ${vulns.id})
+  order by ek.ransomware desc limit 1
 ) exploit on true`;
+
+// Advisories listed in CISA KEV, through an alias or their own ID. A few
+// hundred, so Postgres checks membership with one hash lookup per row.
+const isExploited = sql<boolean>`${vulns.id} in (
+  select v.id from ${vulns} v join ${kev} k on v.aliases @> array[k.cve_id]
+  union select v.id from ${vulns} v join ${kev} k on v.id = k.cve_id
+)`;
+
+// KEV entries without a (non-withdrawn) advisory of their own. Two checks
+// rather than one with "or", so each can use its index (aliases GIN, id key).
+const kevOnly = sql`not exists (
+    select 1 from ${vulns} v where v.aliases @> array[${kev.cveId}] and v.withdrawn is null
+  ) and not exists (
+    select 1 from ${vulns} v where v.id = ${kev.cveId} and v.withdrawn is null
+  )`;
 
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, "\\$&")}%`;
 
@@ -75,7 +91,7 @@ function osvConditions({
   const conditions: SQL[] = [isNull(vulns.withdrawn)];
   if (kind === "advisories" || kind === "packages") conditions.push(sql`not ${isMalware}`);
   if (kind === "malware") conditions.push(isMalware);
-  if (kind === "exploited") conditions.push(sql`exploit.ransomware is not null`);
+  if (kind === "exploited") conditions.push(isExploited);
   if (severities?.length) conditions.push(inArray(vulns.severity, severities));
   if (publishedSince) conditions.push(gte(vulns.published, publishedSince));
   if (ecosystems?.length || packages?.length) {
@@ -114,9 +130,7 @@ function kevConditions({ ecosystems, packages, categories, severities, query, pu
   if (kind === "packages" || kind === "malware") return null;
   if (severities?.length || ecosystems?.length || packages?.length) return null;
   const conditions: SQL[] = [
-    sql`not exists (
-      select 1 from ${vulns} v where v.withdrawn is null and (v.aliases @> array[${kev.cveId}] or v.id = ${kev.cveId})
-    )`,
+    kevOnly,
   ];
   if (publishedSince) conditions.push(gte(kev.dateAdded, publishedSince));
   if (categories?.length) {
@@ -148,24 +162,34 @@ export async function listVulns(
     sort = "newest",
   }: { page?: number; limit?: number; sort?: Sort } = {},
 ): Promise<VulnSummary[]> {
-  const advisories = sql`select ${vulns.id} as id, ${vulns.aliases} as aliases, ${vulns.summary} as summary,
-      ${vulns.severity} as severity, ${vulns.published} as published, ${vulns.modified} as updated,
-      ${packagesOf} as packages, exploit.ransomware is not null as exploited,
-      coalesce(exploit.ransomware, false) as ransomware, null::text as vendor, null::text as kev_product
-    from ${vulns} ${exploitOf}
+  // Pick the page from narrow rows first, then fetch the details for just
+  // those rows: with a full local copy of OSV there are hundreds of thousands.
+  const advisories = sql`select 'osv' as source, ${vulns.id} as id, ${vulns.severity} as severity,
+      ${vulns.published} as published, ${vulns.modified} as updated, ${isExploited} as exploited
+    from ${vulns}
     where ${and(...osvConditions(filter))}`;
   const kevWhere = kevConditions(filter);
   const exploitedOnly = kevWhere
     ? sql`union all
-    select ${kev.cveId}, array[]::text[], ${kev.name}, null::text, ${kev.dateAdded}, ${kev.dateAdded},
-      '[]'::json, true, ${kev.ransomware}, ${kev.vendor}, ${kev.product}
+    select 'kev', ${kev.cveId}, null::text, ${kev.dateAdded}, ${kev.dateAdded}, true
     from ${kev}
     where ${and(...kevWhere)}`
     : sql``;
 
-  const { rows } = await getDb().execute<ListRow>(sql`select * from (${advisories} ${exploitedOnly}) as listed
-    order by ${orderFor(sort)}, id asc
-    limit ${limit} offset ${(page - 1) * limit}`);
+  const rows = await queryRows<ListRow>(getDb(), sql`
+    select listed.id, listed.severity, listed.published, listed.exploited,
+      coalesce(${vulns.aliases}, array[]::text[]) as aliases, coalesce(${vulns.summary}, ${kev.name}) as summary,
+      ${packagesOf} as packages, coalesce(exploit.ransomware, ${kev.ransomware}, false) as ransomware,
+      ${kev.vendor} as vendor, ${kev.product} as kev_product
+    from (
+      select * from (${advisories} ${exploitedOnly}) as candidates
+      order by ${orderFor(sort)}, id asc
+      limit ${limit} offset ${(page - 1) * limit}
+    ) as listed
+    left join ${vulns} on listed.source = 'osv' and ${vulns.id} = listed.id
+    left join ${kev} on listed.source = 'kev' and ${kev.cveId} = listed.id
+    ${exploitOf}
+    order by ${orderFor(sort, "listed")}, listed.id asc`);
   return rows.map(({ vendor, kev_product, published, ...row }) => ({
     ...row,
     published: published === null ? null : new Date(published),
@@ -173,15 +197,18 @@ export async function listVulns(
   }));
 }
 
-function orderFor(sort: Sort): SQL {
-  const newest = sql`published desc nulls last`;
+// Column names, optionally qualified (the outer query also joins tables with
+// columns of the same names).
+function orderFor(sort: Sort, from?: string): SQL {
+  const col = (name: string) => sql.raw(from ? `${from}.${name}` : name);
+  const newest = sql`${col("published")} desc nulls last`;
   switch (sort) {
     case "severity":
       // CISA publishes no score, but being exploited ranks an advisory with high ones.
-      return sql`case severity when 'critical' then 0 when 'high' then 1 when 'medium' then 2 when 'low' then 3
-        else case when exploited then 1 else 4 end end, ${newest}`;
+      return sql`case ${col("severity")} when 'critical' then 0 when 'high' then 1 when 'medium' then 2 when 'low' then 3
+        else case when ${col("exploited")} then 1 else 4 end end, ${newest}`;
     case "updated":
-      return sql`updated desc`;
+      return sql`${col("updated")} desc`;
     case "newest":
       return newest;
   }
@@ -259,10 +286,6 @@ export async function countRecent(since: Date): Promise<RecentCounts> {
   return counts;
 }
 
-// Pages in the sitemap: every advisory, plus KEV entries without one.
-const kevOnly = sql`not exists (
-  select 1 from ${vulns} v where v.withdrawn is null and (v.aliases @> array[${kev.cveId}] or v.id = ${kev.cveId})
-)`;
 
 export async function countVulns(): Promise<number> {
   const [[advisories], [exploits]] = await Promise.all([
@@ -273,7 +296,7 @@ export async function countVulns(): Promise<number> {
 }
 
 export async function listVulnIdsForSitemap(offset: number, limit: number): Promise<{ id: string; modified: Date }[]> {
-  const { rows } = await getDb().execute<{ id: string; modified: string }>(sql`
+  const rows = await queryRows<{ id: string; modified: string }>(getDb(), sql`
     select id, modified from (
       select ${vulns.id} as id, ${vulns.modified} as modified from ${vulns} where ${isNull(vulns.withdrawn)}
       union all

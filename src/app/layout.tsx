@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
+import { ImportNotice } from "@/components/import-notice";
 import { Logo } from "@/components/logo";
 import { KEV_CATALOG_URL, SITE_DESCRIPTION, SITE_NAME, SOURCE_URL, siteUrl } from "@/lib/site";
 import "./globals.css";
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col font-sans">
         <SiteHeader />
+        <ImportNotice />
         <main className="flex-1">{children}</main>
         <SiteFooter />
       </body>

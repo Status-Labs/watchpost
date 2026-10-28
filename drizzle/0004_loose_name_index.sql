@@ -1,0 +1,1 @@
+CREATE INDEX "vuln_packages_loose_name_idx" ON "vuln_packages" USING btree ("ecosystem",lower(regexp_replace("name", '[-_.]+', '-', 'g')));

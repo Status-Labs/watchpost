@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -51,6 +52,8 @@ export const vulnPackages = pgTable(
   (t) => [
     primaryKey({ columns: [t.vulnId, t.ecosystem, t.name] }),
     index("vuln_packages_package_idx").on(t.ecosystem, t.name),
+    // Registry-style name matching for checks (see src/match/local.ts).
+    index("vuln_packages_loose_name_idx").on(t.ecosystem, sql`lower(regexp_replace(${t.name}, '[-_.]+', '-', 'g'))`),
   ],
 );
 

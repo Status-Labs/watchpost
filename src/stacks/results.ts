@@ -1,3 +1,4 @@
+import { normalizeName } from "@/match/names";
 import type { Severity } from "@/db/schema";
 import { VERSION_SHAPE } from "@/lib/sanitize";
 
@@ -33,7 +34,8 @@ export function fixedVersions(record: unknown, ecosystem: string, name: string):
   const fixed = new Set<string>();
   for (const entry of affected) {
     const pkg = entry?.package;
-    if (!pkg || pkg.name !== name || String(pkg.ecosystem).split(":")[0] !== ecosystem) continue;
+    if (!pkg || typeof pkg.name !== "string" || String(pkg.ecosystem).split(":")[0] !== ecosystem) continue;
+    if (normalizeName(ecosystem, pkg.name) !== normalizeName(ecosystem, name)) continue;
     for (const range of Array.isArray(entry.ranges) ? entry.ranges : []) {
       if (range?.type === "GIT") continue;
       for (const event of Array.isArray(range?.events) ? range.events : []) {

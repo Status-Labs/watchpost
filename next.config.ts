@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
+// The local app (npx) is a separate build, with a standalone server and a
+// first-run progress notice that hosted pages don't need.
+const isLocalBuild = process.env.WATCHPOST_LOCAL_BUILD === "1";
 
 // Next.js inlines its bootstrap scripts, so script-src needs 'unsafe-inline'
 // without nonces (which would make every page dynamic). We never render
@@ -34,6 +37,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  output: isLocalBuild ? "standalone" : undefined,
+  env: { NEXT_PUBLIC_LOCAL_BUILD: isLocalBuild ? "1" : "" },
   cacheComponents: true,
   partialPrefetching: true,
   cacheLife: {

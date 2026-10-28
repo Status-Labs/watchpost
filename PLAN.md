@@ -83,7 +83,7 @@ Only hashes of tokens and keys are stored.
 
 Ideas for people who don't want their stack stored anywhere, not even anonymously:
 
-- **On their own machine.** Their AI assistant or a cron job reads lockfiles and compares them against public data, keeping the results local. Building blocks: a stateless check endpoint (below), or OSV's own API and `osv-scanner`, which already do this. Watchpost would add a ready-made prompt and script, and readable output. This is the "Private mode" idea from "Optional CLI", without requiring a CLI.
+- **On their own machine.** Their AI assistant or a cron job reads lockfiles and compares them against public data, keeping the results local. Building blocks: a stateless check endpoint (below), or OSV's own API and `osv-scanner`, which already do this. Watchpost would add a ready-made prompt and script, and readable output. The local app (below) takes this further: checks run fully offline.
 - **A drop-in form on the site.** Drop a lockfile (`package-lock.json`, `pnpm-lock.yaml`, `requirements.txt`, `go.sum`, `Cargo.lock`, ...) or paste a list. The browser parses it locally and sends only package names and versions; the page shows the results. Nothing is stored and there's no workspace. `package.json` alone holds version ranges (`^1.2.3`), not installed versions, so lockfiles give exact answers.
 - **Shared piece:** `POST /api/check` takes up to a few thousand packages, asks OSV which known vulnerabilities affect them, and returns structured results without storing or logging the list. It uses the same validation as `report_stack`, and the same rate limits as the other open endpoints.
 
@@ -238,15 +238,28 @@ It's free and anonymous, so it has to stay cheap even if it gets popular, and de
 - GitHub Sponsors or Open Collective for donations.
 - Everything is self-hostable, so the project outlives our hosting if it has to.
 
-## Optional CLI (later)
+## Local app (archived)
 
-A small open source CLI for people who want more privacy than the remote MCP server gives. Not required: the remote server stays the default because it needs no install.
+**Archived on 2026-10-28 on the `feat/local-app` branch.** It worked (offline checks matched OSV's API exactly), but the full local copy of OSV takes about 1.4 GB on the user's device, which is too much. Revisit only with a much smaller footprint, for example storing malicious-package reports as just ID, package and versions, or downloading only the ecosystems someone uses.
 
-- **The CLI collects the data, not the AI.** It parses lockfiles itself and only ever extracts ecosystem, name and version. `watchpost scan --dry-run` prints the exact payload before anything is sent.
-- **Keychain storage.** The token lives in the OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service) instead of a plain MCP config file.
-- **Local MCP proxy.** `watchpost mcp` runs as a local MCP server for the AI app. It holds the token so the assistant never sees it, and strips advisory free text before the assistant reads it.
-- **Private mode.** Lookups by a short hash prefix of each package name (like Have I Been Pwned's password check): the server returns everything in those buckets and the CLI keeps the matches, so we never learn the stack. No hosted feed in this mode; the CLI alerts locally from a scheduled run.
-- **Release safety.** A compromised CLI runs on users' machines, so: signed releases with provenance, pinned versions in the docs (never `@latest`), and the same 7-day release-age rule we use for our own dependencies.
+The whole app on the user's own machine: the web UI, the MCP server and a full copy of the public data. Checks run offline, so the package list never leaves the machine. watchpost.now stays up for public browsing, RSS and docs, and becomes the install page; its no-install check stays as the quick option.
+
+- **Install:** `npx @status-labs/watchpost@<version>` (the `watchpost` name on npm is taken). Pinned versions in all docs, never `@latest`. It starts the app at `http://127.0.0.1:4141` and opens the browser.
+- **AI apps:** the MCP config runs `npx -y @status-labs/watchpost@<version> mcp`, a small stdio bridge that starts the local app if it isn't running and forwards to its MCP endpoint. No URL, token or port in the AI app's config. One process owns the database; the bridge never opens it.
+- **Database:** PGlite (Postgres compiled to WebAssembly) in a local data folder (`~/.local/share/watchpost`, `~/Library/Application Support/Watchpost` or `%LOCALAPPDATA%\Watchpost`). Same schema and queries as the hosted Postgres, so there's one codebase. `DATABASE_URL` selects hosted Postgres; without it, local mode uses PGlite.
+- **Data:** the first run downloads OSV's per-ecosystem archives (about 300 MB compressed, mostly npm malware reports) and the CISA KEV catalog, with progress on the home page. After that the app runs the same incremental syncs as the hosted cron, on a timer, while it's open.
+- **Offline matching:** for each package, load the advisories naming it and evaluate their affected ranges: exact `versions` lists first, then `SEMVER` ranges, then `ECOSYSTEM` ranges with a comparator per ecosystem (PyPI's PEP 440, Maven, NuGet, RubyGems, Packagist, Hackage, CRAN; the rest are semver-like). Before release, compare offline results with OSV's API on a large synthetic package list. Tests use recorded fixtures.
+- **Local network rules:** the only outbound requests are to OSV's bucket and CISA, and they carry nothing about the user. The server binds to 127.0.0.1, accepts only `localhost`/`127.0.0.1` Host headers (against DNS rebinding) and rejects cross-site browser requests, so a website can't query it.
+- **Not in local mode:** workspaces, OAuth, keys, cron routes and sitemaps.
+- **Release safety.** A compromised package runs on users' machines, so: npm trusted publishing from GitHub Actions with provenance, pinned versions in the docs, the same 7-day release-age rule for our own dependencies, and few runtime dependencies.
+
+Steps:
+1. ✅ PGlite and local mode, full OSV download, in-process syncs. The full history is about 292k advisories (240k of them npm malware reports) and 1.4 GB on disk.
+2. ✅ Offline matcher: osv-scalibr's comparators ported to TypeScript (all 42k fixture cases pass; identical to the Go code on 1.26M generated pairs). `scripts/parity.mts` found 0 differences from OSV's API across 42,535 matches in 12 ecosystems.
+3. ✅ The CLI: Next.js standalone build, `start`, `mcp` and `stop`, data folder, localhost rules. (`check <lockfile>` later.)
+4. Publishing (npm trusted publishing from a GitHub Actions release workflow, which also fails if the build contains a home-directory path), install docs, the local setup in the prompt tabs, and the install page on watchpost.now.
+
+Later: shrink the 1.4 GB (malware reports need only their package and ID), and move PGlite off the main thread (a worker or `pglite-socket`) so long list queries can't stall MCP calls.
 
 ## Phases
 
@@ -258,4 +271,4 @@ A small open source CLI for people who want more privacy than the remote MCP ser
    - `dashboard_link` moves to phase 3 with the dashboard.
 3. **Matching + dashboard** (on hold): re-match stored stacks on each sync; one-time-code dashboard login and `dashboard_link`. Waits to see whether people want stored stacks, now that checks need no storage. (The daily cleanup job for idle workspaces, expired tokens and abandoned sign-ins shipped with phase 2, after its security review.)
 4. **Later**: NVD CVEs (see "Roadmap: more sources"), give missing CVE pages a real 404 and CVE IDs a real 308 redirect (pages stream, so today they return 200 with `noindex`; a check in `proxy.ts` would fix it), render advisory markdown safely, CVSS v4 scores, OS packages (OSV distro data), team workspaces (shared keys, still no personal info).
-5. **Optional CLI**: the privacy mode above.
+5. **Local app**: see above. Replaces the earlier optional CLI idea (hash-prefix lookups and a keychain token), since offline checks need neither.

@@ -1,0 +1,25 @@
+{
+  "name": "@status-labs/watchpost",
+  "version": "0.1.0",
+  "description": "CVE alerts for your tech stack, checked on your own machine. Web app and MCP server with a local copy of OSV and CISA KEV.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "watchpost": "bin/watchpost.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "app"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "homepage": "https://watchpost.now",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Status-Labs/watchpost.git",
+    "directory": "cli"
+  },
+  "keywords": ["cve", "vulnerability", "osv", "mcp", "security"]
+}

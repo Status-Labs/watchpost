@@ -26,11 +26,15 @@ Self-hosting and deploys: `docs/self-hosting.md`.
 - `just sync`: run one OSV sync against the dev server.
 - `just db-generate` after changing `src/db/schema.ts`, then commit the new file in `drizzle/`.
 - `just check`: lint, types, unit and integration tests, and build. CI runs the same.
+- `just build-local`, then `just local` (or `just local mcp`): build and run the local app from `cli/`, with its data in `.local-data/`.
 
 ## Layout
 
 - `src/osv/`: OSV sync (`sync.ts`), record parsing and CVSS scoring.
 - `src/kev/`: CISA Known Exploited Vulnerabilities sync. Replaces the `kev` table wholesale.
+- `src/local/`: local mode (`WATCHPOST_MODE=local`): PGlite, the first-run import of OSV's full archives, and the timer that calls the cron routes.
+- `src/match/`: offline matching: is this package version inside an advisory's affected ranges? `versions/` is a port of osv-scalibr's comparators (Apache-2.0, see its NOTICE); `fixtures/versions/` holds their test cases.
+- `cli/`: the npm package (`@status-labs/watchpost`): `start`, `mcp` (stdio bridge) and `stop`, plus the server wrapper that refuses non-localhost and cross-site requests. `cli/app/` is build output.
 - `src/lib/categories.ts`: keyword rules for the category filter, shared by SQL and tests.
 - `src/auth/`: the OAuth server for MCP apps (`oauth.ts`), token helpers, and the static keys from `/key`.
 - `src/stacks/`: package validation, stateless checks (`check.ts`), saved stacks (`store.ts`), and OSV's batch query API.
@@ -39,6 +43,8 @@ Self-hosting and deploys: `docs/self-hosting.md`.
 - `src/db/`: Drizzle schema and connection. Migrations live in `drizzle/`.
 - `src/lib/`: queries and output formats (RSS, markdown, sitemaps).
 - `src/app/`: pages and route handlers. Cron entry points are `api/cron/sync-osv` (every 15 minutes), `api/cron/sync-kev` (hourly) and `api/cron/cleanup` (daily).
+
+Local mode uses PGlite, which runs queries on the main thread: a slow query stalls the whole local app, including MCP. Check new list queries against a full local import (`scripts/parity.mts` documents how to get one). PGlite has no autovacuum; the app runs `vacuum analyze` after the import and daily.
 
 Next.js runs with Cache Components. Builds never touch the database:
 - Public vulnerability reads go through `src/lib/cached.ts` (`use cache` with the `sync` profile and the `vulns` tag, which the sync invalidates). CVE pages become static after their first visit and are served from the CDN.

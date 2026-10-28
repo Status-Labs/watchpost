@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     "logo/**",
     "logo2/**",
     "logo3/**",
+    // Local app build output.
+    "cli/app/**",
+    ".local-data/**",
   ]),
 ]);
 

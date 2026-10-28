@@ -48,3 +48,8 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 !.env.example
+
+# local app build output
+/cli/app/
+/.local-data/
+/cli/LICENSE
