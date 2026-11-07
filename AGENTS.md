@@ -4,6 +4,12 @@ Watchpost: CVE alerts for your tech stack, reported by your AI assistant over MC
 
 This is a guide for contributors and coding agents. Read `PLAN.md` for what we're building and why.
 
+## Company context
+
+This is a Status Labs product. Status Labs team members and agents: before starting, read Weeoh, the company brain, at https://github.com/Status-Labs/weeoh (private; start with its `AGENTS.md`). If it's checked out locally, it's at `../weeoh`. Track your work in Shyup under project `WAT`.
+
+Outside contributors can skip this; everything you need is in this repo.
+
 ## Stack
 
 | Area            | Choice                                                |
