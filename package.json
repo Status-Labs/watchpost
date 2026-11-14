@@ -14,14 +14,14 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "2.3.1",
-    "@vercel/functions": "^3.10.1",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@vercel/functions": "^3.11.0",
     "drizzle-orm": "^0.45.4",
-    "mcp-handler": "2.3.0",
-    "next": "16.4.2",
+    "mcp-handler": "2.3.1",
+    "next": "16.4.5",
     "pg": "^8.23.1",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -31,15 +31,15 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "dotenv": "^18.0.8",
+    "dotenv": "^18.0.9",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
-    "eslint-config-next": "16.4.2",
+    "eslint-config-next": "16.4.5",
     "tailwindcss": "^4",
     "testcontainers": "^12.2.1",
     "tsx": "^4.23.15",
     "typescript": "^5",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "packageManager": "pnpm@12.14.0",
   "engines": {
